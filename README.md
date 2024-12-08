@@ -10,6 +10,6 @@ OR
 
 
 
-# Scan stage have a scanning scripts
+# Scan stage havs a scanning scripts
 
 # Branch specific deployment. Production deployment is pointed to main branch and is manual. Rests branch deployment are automated.
