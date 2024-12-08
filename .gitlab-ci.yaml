@@ -1,0 +1,78 @@
+stages:
+  - test
+  - build
+  - scan
+  - deploy
+
+variables:
+  APP_NAME: "hello-world-app"
+  DOCKER_IMAGE: "my-docker-repo/${APP_NAME}:$CI_COMMIT_SHA"
+
+# Securely handling secrets
+secrets:
+  AWS_ACCESS_KEY_ID:
+    vault: production/aws-access-key-id
+  AWS_SECRET_ACCESS_KEY:
+    vault: production/aws-secret-access-key
+
+before_script:
+  - echo "Preparing pipeline for $APP_NAME"
+
+# Linting/Unit tests stage
+test:
+  stage: test
+  script:
+    - echo "Running unit tests"
+    - ./run-tests.sh # Mock script
+  artifacts:
+    paths:
+      - test-results/
+    expire_in: 1 day
+
+# Build Docker image
+build:
+  stage: build
+  script:
+    - echo "Building Docker image $DOCKER_IMAGE"
+    - docker build -t $DOCKER_IMAGE .
+    - docker push $DOCKER_IMAGE
+  only:
+    - main
+    - dev
+    - /^release-.*$/
+  artifacts:
+    paths:
+      - build-results/
+    expire_in: 7 days
+
+# Scan for vulnerabilities
+scan:
+  stage: scan
+  script:
+    - echo "Running security scan"
+    - ./security-scan.sh # Mock script
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+  allow_failure: false
+  after_script:
+    - echo "Scan complete"
+  needs:
+    - build
+
+# Deploy to specific environments
+deploy:
+  stage: deploy
+  script:
+    - echo "Deploying to $CI_ENVIRONMENT_NAME"
+    - ./deploy.sh --env=$CI_ENVIRONMENT_NAME --image=$DOCKER_IMAGE
+  environment:
+    name: $CI_COMMIT_REF_NAME
+    url: https://$CI_COMMIT_REF_NAME.hello-world-app.com
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+      when: manual # Only deploy to prod with manual approval
+    - if: $CI_COMMIT_BRANCH == "dev"
+    - if: $CI_COMMIT_BRANCH =~ /^release-.*$/
+  dependencies:
+    - scan
+
